@@ -63,6 +63,11 @@ from PIL import Image
 from PIL.ExifTags import TAGS
 import logging
 
+# Add the utils parent folder to sys.path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from text_color_formatting.colors import Colors
+
 # Logger config
 logging.basicConfig(
     level=logging.INFO,
@@ -218,8 +223,8 @@ def optimize_image(input_path):
             webp_savings = ((original_size - webp_size) / original_size) * 100
             avif_savings = ((original_size - avif_size) / original_size) * 100
             
-            logger.info(f"With WEBP you saved!: {webp_savings:.2f}%")
-            logger.info(f"With AVIF you saved!: {avif_savings:.2f}%")
+            logger.info(f"{Colors.fg_green('With WEBP you saved!:')} {Colors.underline(Colors.fg_green(f'{webp_savings:.2f}%'))}")
+            logger.info(f"{Colors.fg_green('With AVIF you saved!:')} {Colors.underline(Colors.fg_green(f'{avif_savings:.2f}%'))}")
             
             return {
                 "original": {"path": input_path, "size": original_size, "dimensions": f"{img.width}x{img.height}"},
@@ -268,22 +273,22 @@ def main():
     result = optimize_image(args.image)
     
     if result:
-        print("\n" + "="*50)
-        print(f"  OPTIMIZATION SUMMARY.")
-        print("="*50)
-        print(f"Original: {result['original']['path']} - {result['original']['size']:.2f}KB ({result['original']['dimensions']})")
+        print("\n" + Colors.fg_yellow("=")*50)
+        print(Colors.italic(Colors.fg_blue("  OPTIMIZATION SUMMARY.")))
+        print(Colors.fg_yellow("=")*50)
+        print(f"{Colors.fg_red('Original')}: {result['original']['path']} - {result['original']['size']:.2f}KB ({result['original']['dimensions']})")
         
-        webp_info = f"WebP: {result['webp']['path']} - {result['webp']['size']:.2f}KB (Savings: {result['webp']['savings']:.2f}%)"
+        webp_info = f"{Colors.fg_green('WebP')}: {result['webp']['path']} - {result['webp']['size']:.2f}KB (Savings: {result['webp']['savings']:.2f}%)"
         if result['webp']['resized']:
-            webp_info += " [Redimensioned]"
+            webp_info += " {Colors.bold('[Redimensioned]')}"
         print(webp_info)
         
-        avif_info = f"AVIF: {result['avif']['path']} - {result['avif']['size']:.2f}KB (Savings: {result['avif']['savings']:.2f}%)"
+        avif_info = f"{Colors.fg_green('AVIF')}: {result['avif']['path']} - {result['avif']['size']:.2f}KB (Savings: {result['avif']['savings']:.2f}%)"
         if result['avif']['resized']:
-            avif_info += " [Redimensioned]"
+            avif_info += " {Colors.fg_green('[Redimensioned]')}"
         print(avif_info)
         
-        print("="*50 + "\n")
+        print(Colors.fg_yellow("=")*50 + "\n")
         return 0
     
     return 1
