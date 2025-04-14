@@ -188,7 +188,7 @@ def optimize_to_target_size(img, output_path, format_name, initial_quality=INITI
     if resize_needed:
         original_dimensions = f"{img.width}x{img.height}"
         new_dimensions = f"{current_img.width}x{current_img.height}"
-        logger.info(f"Image redimensioned from {original_dimensions} to {new_dimensions}")
+        logger.info(f"{Colors.underline('Image redimensioned')} from {original_dimensions} to {new_dimensions}")
     
     return current_size, quality, resize_needed
 
@@ -280,12 +280,12 @@ def main():
         
         webp_info = f"{Colors.fg_green('WebP')}: {result['webp']['path']} - {result['webp']['size']:.2f}KB (Savings: {result['webp']['savings']:.2f}%)"
         if result['webp']['resized']:
-            webp_info += " {Colors.bold('[Redimensioned]')}"
+            webp_info += f" {Colors.underline(Colors.bold('[Redimensioned]'))}"
         print(webp_info)
         
         avif_info = f"{Colors.fg_green('AVIF')}: {result['avif']['path']} - {result['avif']['size']:.2f}KB (Savings: {result['avif']['savings']:.2f}%)"
         if result['avif']['resized']:
-            avif_info += " {Colors.fg_green('[Redimensioned]')}"
+            avif_info += f" {Colors.underline(Colors.bold('[Redimensioned]'))}"
         print(avif_info)
         
         print(Colors.fg_yellow("=")*50 + "\n")
