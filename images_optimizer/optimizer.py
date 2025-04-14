@@ -63,7 +63,7 @@ from PIL import Image
 from PIL.ExifTags import TAGS
 import logging
 
-# Configurar logging
+# Logger config
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -71,7 +71,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Instalar dependencias si no están presentes
+# Install dependency if not previously installed
 try:
     import pillow_avif
 except ImportError:
@@ -80,7 +80,7 @@ except ImportError:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "pillow-avif-plugin"])
     import pillow_avif
 
-# Configuraciones
+# Const variables
 TARGET_MIN_SIZE_KB = 30
 TARGET_MAX_SIZE_KB = 90
 MAX_SIZE_KB = 100  # Maximum absolute limit
