@@ -42,12 +42,14 @@ Optimization Algorithm:
 
 Error Handling:
     - Memory Errors: For very large images, Python might run out of memory. Consider pre-scaling very large images.
+    - Format Decision Errors: If the format decision is invalid, the script will exit with an error.
     - Library Import Errors: If auto-installation of pillow-avif-plugin fails, manually install with 'pip install pillow-avif-plugin'.
     - Permission Errors: If the script can't create the "optimized" directory, check write permissions.
     - Corrupt Image Files: Verify image files are valid.
     - Unusual Image Formats: Only .jpg, .jpeg, .png are supported.
 
 Edge Cases:
+    - Low-end Hardware: AVIF processing can be slow on low-end hardware.
     - Unusual Color Modes: May struggle with CMYK, LAB, etc.
     - Animated Images: Not designed for GIFs or multi-frame images.
     - Metadata Preservation: Only EXIF data is preserved.
@@ -127,7 +129,11 @@ INITIAL_QUALITY = 80  # Decrease initial quality
 MIN_QUALITY = 30  # Decrease until minimum quality limit
 RESIZE_FACTOR = 0.8  # Factor to redimension if needed
 MAX_WORKERS = 4  # Number of concurrent workers for parallel processing
-USER_INPUT_DIR_NAME = input("How would you like to name the folder?\nR: ").strip()
+USER_INPUT_DIR_NAME = input(f"\n{Colors.fg_cyan('How would you like to name the folder?')}\n{Colors.blink(Colors.underline('R:'))} ").strip()
+
+# Ask user for desired web formate, either WebP, AVIF, or both.
+format_decision = int(input(f"\n\n{Colors.fg_cyan('Type just the number with no lead and trailing spaces, to decide if want the output files in:')} \n1) WebP format.\n2) AVIF format.\n3) Both.\n{Colors.blink(Colors.underline('R:'))} ").strip())
+
 
 def get_output_path(input_path, format_name):
     """Creates the output path for optimized images."""
@@ -150,6 +156,24 @@ def preserve_metadata(img):
     except Exception as e:
         logger.warning(f"Could not extract EXIF metadata: {e}")
     return exif_data
+
+def get_optimal_workers(format_name):
+    """Determine optimal number of workers based on format and system resources"""
+    if format_name.upper() == "AVIF":
+        return max(1, min(2, MAX_WORKERS // 2))  # Max 2 workers for AVIF on low-end hardware
+    return MAX_WORKERS  # Keep original for WebP
+
+def get_initial_quality(format_name, original_size):
+    """Get format-specific initial quality to reduce processing time"""
+    if format_name.upper() == "AVIF":
+        # More aggressive quality reduction for AVIF to improve processing speed
+        if original_size > 500:
+            return max(MIN_QUALITY, INITIAL_QUALITY - 20)
+        return max(MIN_QUALITY, INITIAL_QUALITY - 15)
+    # For WebP, keep original logic but slightly more aggressive for large files
+    if original_size > 500:
+        return max(MIN_QUALITY, INITIAL_QUALITY - 10)
+    return INITIAL_QUALITY
 
 def optimize_to_target_size(img, output_path, format_name, initial_quality=INITIAL_QUALITY):
     """
@@ -251,42 +275,89 @@ def optimize_image(input_path):
             original_size = os.path.getsize(input_path) / 1024  # KB
             logger.debug(f"Original image: {input_path} - {original_size:.2f}KB")
             
-            # For bigger images (in size), adjust initial quality
-            initial_quality = INITIAL_QUALITY
-            if original_size > 500:
-                initial_quality = max(MIN_QUALITY, INITIAL_QUALITY - 10)
-                logger.debug(f"Big image size detected, using initial image size: {initial_quality}")
-            
-            # Optimize to WEBP
-            webp_size, webp_quality, webp_resized = optimize_to_target_size(img, webp_path, "WEBP", initial_quality)
-            logger.debug(f"WEBP optimized: {webp_path} - {webp_size:.2f}KB (quality: {webp_quality})")
-            
-            # Optimize to AVIF
-            avif_size, avif_quality, avif_resized = optimize_to_target_size(img, avif_path, "AVIF", initial_quality)
-            logger.debug(f"AVIF optimized: {avif_path} - {avif_size:.2f}KB (quality: {avif_quality})")
-            
-            # Calculate files savings
-            webp_savings = ((original_size - webp_size) / original_size) * 100
-            avif_savings = ((original_size - avif_size) / original_size) * 100
-            
-            return {
-                "status": "success",
-                "original": {"path": input_path, "size": original_size, "dimensions": f"{img.width}x{img.height}"},
-                "webp": {
-                    "path": webp_path, 
-                    "size": webp_size, 
-                    "quality": webp_quality, 
-                    "savings": webp_savings,
-                    "resized": webp_resized
-                },
-                "avif": {
-                    "path": avif_path, 
-                    "size": avif_size, 
-                    "quality": avif_quality, 
-                    "savings": avif_savings,
-                    "resized": avif_resized
-                }
-            }
+            match format_decision:
+                case 1:
+                    # Optimize to WEBP
+                    initial_quality = get_initial_quality("WEBP", original_size)
+                    webp_size, webp_quality, webp_resized = optimize_to_target_size(img, webp_path, "WEBP", initial_quality)
+                    logger.debug(f"WEBP optimized: {webp_path} - {webp_size:.2f}KB (quality: {webp_quality})")
+                    
+                    # Calculate file savings.
+                    webp_savings = ((original_size - webp_size) / original_size) * 100
+                    
+                    return {
+                            "status": "success",
+                            "original": {"path": input_path, "size": original_size, "dimensions": f"{img.width}x{img.height}"},
+                            "webp": {
+                            "path": webp_path,
+                            "size": webp_size,
+                            "quality": webp_quality,
+                            "savings": webp_savings,
+                            "resized": webp_resized
+                    }}
+
+                case 2:
+                    # Optimize to AVIF
+                    initial_quality = get_initial_quality("AVIF", original_size)
+                    avif_size, avif_quality, avif_resized = optimize_to_target_size(img, avif_path, "AVIF", initial_quality)
+                    logger.debug(f"AVIF optimized: {avif_path} - {avif_size:.2f}KB (quality: {avif_quality})")
+                    
+                    # Calculate file savings.
+                    avif_savings = ((original_size - avif_size) / original_size) * 100
+
+                    return {
+                            "status": "success",
+                            "original": {"path": input_path, "size": original_size, "dimensions": f"{img.width}x{img.height}"},
+                            "avif": {
+                            "path": avif_path,
+                            "size": avif_size,
+                            "quality": avif_quality,
+                            "savings": avif_savings,
+                            "resized": avif_resized
+                    }}
+
+                case 3:
+                    # Optimize to both formats
+                    webp_initial_quality = get_initial_quality("WEBP", original_size)
+                    avif_initial_quality = get_initial_quality("AVIF", original_size)
+                    
+                    # Optimize to WEBP
+                    webp_size, webp_quality, webp_resized = optimize_to_target_size(img, webp_path, "WEBP", webp_initial_quality)
+                    logger.debug(f"WEBP optimized: {webp_path} - {webp_size:.2f}KB (quality: {webp_quality})")
+                    
+                    # Optimize to AVIF
+                    avif_size, avif_quality, avif_resized = optimize_to_target_size(img, avif_path, "AVIF", avif_initial_quality)
+                    logger.debug(f"AVIF optimized: {avif_path} - {avif_size:.2f}KB (quality: {avif_quality})")
+                    
+                    # Calculate files savings
+                    webp_savings = ((original_size - webp_size) / original_size) * 100
+                    avif_savings = ((original_size - avif_size) / original_size) * 100
+                    
+                    return {
+                        "status": "success",
+                        "original": {"path": input_path, "size": original_size, "dimensions": f"{img.width}x{img.height}"},
+                        "webp": {
+                            "path": webp_path, 
+                            "size": webp_size, 
+                            "quality": webp_quality, 
+                            "savings": webp_savings,
+                            "resized": webp_resized
+                        },
+                        "avif": {
+                            "path": avif_path, 
+                            "size": avif_size, 
+                            "quality": avif_quality, 
+                            "savings": avif_savings,
+                            "resized": avif_resized
+                    }}
+                
+                case _:
+                    logger.error(f"Invalid format decision: {format_decision}")
+                    return {
+                        "status": "error",
+                        "path": input_path,
+                        "error": "Invalid format decision"
+                    }
     
     except Exception as e:
         logger.error(f"Error optimizing {input_path}: {e}")
@@ -328,7 +399,10 @@ def process_batch(image_files, max_workers=MAX_WORKERS):
         "start_time": time.time()
     }
     
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+    # Determine optimal worker count based on format
+    optimal_workers = get_optimal_workers("AVIF" if format_decision == 2 else "WEBP")
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=optimal_workers) as executor:
         # Submit all tasks
         future_to_image = {executor.submit(optimize_image, str(img_path)): img_path for img_path in image_files}
         
@@ -342,8 +416,13 @@ def process_batch(image_files, max_workers=MAX_WORKERS):
                     
                     if result["status"] == "success":
                         results["successful"] += 1
-                        results["total_savings"]["webp"] += result["webp"]["savings"]
-                        results["total_savings"]["avif"] += result["avif"]["savings"]
+                        if format_decision == 1:
+                            results["total_savings"]["webp"] += result.get("webp", {}).get("savings", 0)
+                        elif format_decision == 2:
+                            results["total_savings"]["avif"] += result.get("avif", {}).get("savings", 0)
+                        else:
+                            results["total_savings"]["webp"] += result.get("webp", {}).get("savings", 0)
+                            results["total_savings"]["avif"] += result.get("avif", {}).get("savings", 0)
                     elif result["status"] == "skipped":
                         results["skipped"] += 1
                     else:
@@ -386,8 +465,14 @@ def print_summary(results):
     
     if results['successful'] > 0:
         print(f"\nAverage savings:")
-        print(f"  WebP: {results['average_savings']['webp']:.2f}%")
-        print(f"  AVIF: {results['average_savings']['avif']:.2f}%")
+
+        if format_decision == 1:
+            print(f"  WebP: {results['average_savings']['webp']:.2f}%")
+        elif format_decision == 2:
+            print(f"  AVIF: {results['average_savings']['avif']:.2f}%")
+        else:
+            print(f"  WebP: {results['average_savings']['webp']:.2f}%")
+            print(f"  AVIF: {results['average_savings']['avif']:.2f}%")
     
     print(f"\nTotal processing time: {results['total_time'] / 60:.2f} minutes")
     
@@ -443,23 +528,37 @@ def main():
             
             if results['successful'] > 0:
                 f.write(f"Average savings:\n")
-                f.write(f"  WebP: {results['average_savings']['webp']:.2f}%\n")
-                f.write(f"  AVIF: {results['average_savings']['avif']:.2f}%\n\n")
+                if format_decision == 1:
+                    f.write(f"  WebP: {results['average_savings']['webp']:.2f}%\n")
+                elif format_decision == 2:
+                    f.write(f"  AVIF: {results['average_savings']['avif']:.2f}%\n")
+                else:
+                    f.write(f"  WebP: {results['average_savings']['webp']:.2f}%\n")
+                    f.write(f"  AVIF: {results['average_savings']['avif']:.2f}%\n")
             
-            f.write(f"Total processing time: {results['total_time']:.2f} seconds\n\n")
+            f.write(f"Total processing time: {results['total_time'] / 60:.2f} minutes\n\n")
             
             f.write("SUCCESSFULLY OPTIMIZED IMAGES:\n")
             for detail in results["details"]:
                 if detail.get("status") == "success":
                     original = detail["original"]
-                    webp = detail["webp"]
-                    avif = detail["avif"]
+                    if format_decision == 1:
+                        webp = detail["webp"]
+                        avif = None
+                    elif format_decision == 2:
+                        webp = None
+                        avif = detail["avif"]
+                    else:
+                        webp = detail["webp"]
+                        avif = detail["avif"]
                     
                     f.write(f"\n- Original: {original['path']}\n")
                     f.write(f"  Size: {original['size']:.2f}KB, Dimensions: {original['dimensions']}\n")
-                    f.write(f"  WebP: {webp['path']} - {webp['size']:.2f}KB (Savings: {webp['savings']:.2f}%, Quality: {webp['quality']})\n")
-                    f.write(f"  AVIF: {avif['path']} - {avif['size']:.2f}KB (Savings: {avif['savings']:.2f}%, Quality: {avif['quality']})\n")
-            
+                    if webp:
+                        f.write(f"  WebP: {webp['path']} - {webp['size']:.2f}KB (Savings: {webp['savings']:.2f}%, Quality: {webp['quality']})\n")
+                    if avif:
+                        f.write(f"  AVIF: {avif['path']} - {avif['size']:.2f}KB (Savings: {avif['savings']:.2f}%, Quality: {avif['quality']})\n")
+
             if results['skipped'] > 0:
                 f.write("\nSKIPPED IMAGES:\n")
                 for detail in results["details"]:
