@@ -127,11 +127,12 @@ INITIAL_QUALITY = 80  # Decrease initial quality
 MIN_QUALITY = 30  # Decrease until minimum quality limit
 RESIZE_FACTOR = 0.8  # Factor to redimension if needed
 MAX_WORKERS = 4  # Number of concurrent workers for parallel processing
+USER_INPUT_DIR_NAME = input("How would you like to name the folder?\nR: ").strip()
 
 def get_output_path(input_path, format_name):
     """Creates the output path for optimized images."""
     input_path = Path(input_path)
-    output_dir = input_path.parent / "optimized"
+    output_dir = input_path.parent / USER_INPUT_DIR_NAME
     output_dir.mkdir(exist_ok=True)
     
     base_name = input_path.stem
