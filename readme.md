@@ -33,7 +33,7 @@ The repository welcomes contributions. Built for Python programmers that wants t
 To set things up, follow the steps below:
 ```bash
 # This project can be run in any MacOS or Linux Distribution terminal.
-# Python 3.7+ is RECOMMENDED
+# Python 3.10+ is RECOMMENDED
 
 # Clone this repository
 $ git clone git@github.com:codinSamueldev/utils.git
